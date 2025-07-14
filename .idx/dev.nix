@@ -30,11 +30,15 @@
       };
     };
     # Enable previews and customize configuration
-    previews = {
-      enable = true;
-      previews = {
+ previews = {
+ enable = true;
+       previews = {
         web = {
-          command = ["npm" "run" "dev" "--" "--port" "$PORT" "--hostname" "0.0.0.0"];
+            # This command will start your application.
+ command = ["npm" "run" "dev" "--" "--port" "$PORT" "--hostname" "0.0.0.0"];
+            # This option specifies the port that your application listens on.
+            # In this case, it is listening on the port assigned to it by the $PORT environment variable.
+            # port = 3000;
           manager = "web";
         };
       };
