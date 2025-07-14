@@ -1,4 +1,4 @@
-# Documentação Completa da Aplicação "Propósitos"
+# Documentação Completa da Aplicação "Noivos - Propósitos"
 
 Bem-vindo(a) à documentação oficial da plataforma "Propósitos". Este guia detalha todas as funcionalidades disponíveis, tanto do ponto de vista do administrador quanto do casal.
 
