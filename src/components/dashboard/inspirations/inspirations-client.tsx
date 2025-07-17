@@ -22,6 +22,7 @@ import { useWedding } from '@/context/wedding-context';
 import { useToast } from '@/hooks/use-toast';
 import type { Inspiration, InspirationCategory, InspirationComment } from '@/lib/types';
 import Image from 'next/image';
+import { searchUnsplashImages } from '@/app/actions/unsplash-actions';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +32,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, PlusCircle, Edit, Trash2, MessageSquare, Send, Link as LinkIcon } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, PlusCircle, Edit, Trash2, MessageSquare, Send, Link as LinkIcon, Search } from 'lucide-react';
 import ImageUploader from '@/components/ui/image-uploader';
 
 const categoryFormSchema = z.object({
@@ -41,7 +43,7 @@ const categoryFormSchema = z.object({
 const inspirationFormSchema = z.object({
   notes: z.string().optional(),
   imageUrl: z.string().url({ message: "É necessário enviar uma imagem." }),
-  categoryId: z.string(),
+  categoryId: z.string().min(1, { message: "Selecione uma categoria." }),
   link: z.string().url({ message: "Por favor, insira um URL válido." }).optional().or(z.literal('')),
 });
 
@@ -63,6 +65,13 @@ const EmptyState = ({ onAddCategory }: { onAddCategory: () => void }) => (
     </Card>
 );
 
+interface UnsplashImage {
+    id: string;
+    urls: { regular: string; };
+    alt_description: string;
+    user: { name: string; };
+}
+
 export default function InspirationsClient() {
   const { toast } = useToast();
   const { activeWeddingId, loading, userProfile, inspirationCategories, inspirations } = useWedding();
@@ -77,6 +86,13 @@ export default function InspirationsClient() {
   // Comments State
   const [comments, setComments] = useState<InspirationComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+
+  // Unsplash Search State
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<UnsplashImage[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [imageToSave, setImageToSave] = useState<UnsplashImage | null>(null);
 
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
@@ -105,6 +121,18 @@ export default function InspirationsClient() {
       });
     }
   }, [editingInspiration, inspirationForm]);
+
+   useEffect(() => {
+    if (imageToSave) {
+        inspirationForm.reset({
+            notes: imageToSave.alt_description || '',
+            imageUrl: imageToSave.urls.regular,
+            categoryId: activeTab || inspirationCategories[0]?.id || '',
+            link: ''
+        });
+        setIsInspirationDialogOpen(true);
+    }
+  }, [imageToSave, inspirationForm, activeTab, inspirationCategories]);
   
   useEffect(() => {
     if (!viewingInspiration || !activeWeddingId) {
@@ -159,6 +187,7 @@ export default function InspirationsClient() {
         toast({ title: 'Sucesso', description: 'Inspiração adicionada.' });
       }
       setIsInspirationDialogOpen(false);
+      setImageToSave(null);
     } catch (e) { toast({ title: 'Erro', description: 'Não foi possível salvar a inspiração.', variant: 'destructive' }) }
   };
 
@@ -182,12 +211,66 @@ export default function InspirationsClient() {
         commentForm.reset();
     } catch (e) { toast({ title: 'Erro', description: 'Não foi possível salvar o comentário.', variant: 'destructive' }) }
   }
+
+  // --- Unsplash Search ---
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery) return;
+    setIsSearching(true);
+    setSearchResults([]);
+    const result = await searchUnsplashImages(searchQuery);
+    if (result.success && result.images) {
+        setSearchResults(result.images);
+    } else {
+        toast({ title: "Erro na Busca", description: result.error, variant: 'destructive' });
+    }
+    setIsSearching(false);
+  }
   
   if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!activeWeddingId) return <div className="text-center p-8 bg-card rounded-lg">Por favor, selecione um casamento.</div>;
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline">Buscar Inspirações no Unsplash</CardTitle>
+            <CardDescription>Encontre referências de alta qualidade e adicione-as diretamente ao seu mural.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <form onSubmit={handleSearch} className="flex gap-2">
+                <Input 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Ex: buquê de noiva, decoração rústica..."
+                    disabled={isSearching}
+                />
+                <Button type="submit" disabled={isSearching}>
+                    {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
+                    <span className="hidden sm:inline ml-2">Buscar</span>
+                </Button>
+            </form>
+        </CardContent>
+      </Card>
+      
+      {searchResults.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {searchResults.map(img => (
+                <Card key={img.id} className="group relative overflow-hidden cursor-pointer" onClick={() => setImageToSave(img)}>
+                    <Image src={img.urls.regular} alt={img.alt_description} width={400} height={400} className="object-cover aspect-square bg-muted"/>
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 text-center text-white text-xs">
+                        {img.alt_description}
+                    </div>
+                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Button size="icon" className="h-8 w-8"><PlusCircle /></Button>
+                    </div>
+                </Card>
+            ))}
+        </div>
+      )}
+
+      <hr/>
+
       {inspirationCategories.length === 0 ? (
         <EmptyState onAddCategory={() => setIsCategoryDialogOpen(true)} />
       ) : (
@@ -272,24 +355,33 @@ export default function InspirationsClient() {
       </Dialog>
       
       {/* Inspiration Form Dialog */}
-      <Dialog open={isInspirationDialogOpen} onOpenChange={setIsInspirationDialogOpen}>
+      <Dialog open={isInspirationDialogOpen} onOpenChange={(isOpen) => { setIsInspirationDialogOpen(isOpen); if (!isOpen) setImageToSave(null); }}>
           <DialogContent>
               <DialogHeader><DialogTitle>{editingInspiration ? 'Editar Inspiração' : 'Nova Inspiração'}</DialogTitle></DialogHeader>
               <Form {...inspirationForm}>
                   <form onSubmit={inspirationForm.handleSubmit(handleInspirationSubmit)} className="space-y-4">
-                    <FormField control={inspirationForm.control} name="imageUrl" render={() => (
-                      <FormItem>
-                        <FormLabel>Imagem</FormLabel>
-                         <ImageUploader initialImageUrl={inspirationForm.getValues('imageUrl') || null} onUploadComplete={(url) => inspirationForm.setValue('imageUrl', url, { shouldValidate: true })} aspectRatio="aspect-square"/>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                    {inspirationForm.getValues('imageUrl') && (
+                         <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
+                            <Image src={inspirationForm.getValues('imageUrl')} alt="inspiração" layout="fill" className="object-cover"/>
+                        </div>
+                    )}
+                    <FormField control={inspirationForm.control} name="categoryId" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Salvar na Categoria</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Selecione uma categoria..."/></SelectTrigger></FormControl>
+                                <SelectContent>
+                                    {inspirationCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </FormItem>
+                    )}/>
                     <FormField control={inspirationForm.control} name="notes" render={({ field }) => (
                         <FormItem><FormLabel>Notas (Opcional)</FormLabel><FormControl><Textarea placeholder="Descreva a imagem, o que você gosta nela, etc." {...field}/></FormControl><FormMessage/></FormItem>
                     )}/>
                     <FormField control={inspirationForm.control} name="link" render={({ field }) => (
                         <FormItem><FormLabel>Link de Referência (Opcional)</FormLabel><FormControl><Input placeholder="https://exemplo.com/produto" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
+                    )}/>
                     <DialogFooter><DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose><Button type="submit">Salvar</Button></DialogFooter>
                   </form>
               </Form>

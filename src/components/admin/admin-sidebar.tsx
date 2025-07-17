@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Shield, Building, Users, LayoutDashboard, ArrowLeftCircle, Bot, Megaphone, Zap } from 'lucide-react';
+import { Shield, Building, Users, LayoutDashboard, ArrowLeftCircle, Bot, Megaphone, Zap, Variable } from 'lucide-react';
 import { Button } from '../ui/button';
 
 const adminMenuItems = [
@@ -13,6 +13,7 @@ const adminMenuItems = [
   { href: '/admin/prompts', label: 'Gerenciar Prompts', icon: Bot },
   { href: '/admin/notifications', label: 'Notificações Manuais', icon: Megaphone },
   { href: '/admin/automations', label: 'Gerenciar Automações', icon: Zap },
+  { href: '/admin/variables', label: 'Gerenciar Variáveis', icon: Variable },
 ];
 
 const NavLink = ({ item, pathname }: { item: { href: string; label: string; icon: React.ElementType }, pathname: string | null }) => (
