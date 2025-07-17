@@ -74,6 +74,7 @@ export interface GiftSuggestion {
   id: string;
   name: string;
   description?: string;
+  imageUrl?: string | null;
   claimed: boolean;
   createdAt: Timestamp;
 }

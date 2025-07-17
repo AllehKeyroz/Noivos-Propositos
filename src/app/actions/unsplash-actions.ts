@@ -21,7 +21,7 @@ interface UnsplashImage {
     };
 }
 
-export async function searchUnsplashImages(query: string): Promise<{ success: boolean; images?: UnsplashImage[]; error?: string }> {
+export async function searchUnsplashImages(query: string, page: number = 1): Promise<{ success: boolean; images?: UnsplashImage[]; error?: string }> {
     if (!query) {
         return { success: false, error: 'A busca não pode ser vazia.' };
     }
@@ -37,14 +37,14 @@ export async function searchUnsplashImages(query: string): Promise<{ success: bo
 
         if (!accessKey) {
             console.error("Unsplash Access Key not found in Firestore configs/api_keys.");
-            return { success: false, error: 'A chave da API do Unsplash não está configurada no painel de admin.' };
+            return { success: false, error: 'A chave da API de imagens não está configurada no painel de admin.' };
         }
     } catch (dbError) {
         console.error("Error fetching Unsplash API key from Firestore:", dbError);
         return { success: false, error: 'Não foi possível buscar a chave da API.' };
     }
 
-    const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=20&lang=pt`;
+    const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=20&page=${page}&lang=pt`;
 
     try {
         const response = await fetch(endpoint, {
@@ -57,7 +57,7 @@ export async function searchUnsplashImages(query: string): Promise<{ success: bo
             console.error(`Unsplash API error: ${response.status} ${response.statusText}`);
             const errorBody = await response.json();
             console.error("Unsplash error body:", errorBody);
-            return { success: false, error: `Erro na API do Unsplash: ${errorBody.errors?.[0] || response.statusText}` };
+            return { success: false, error: `Erro na API de imagens: ${errorBody.errors?.[0] || response.statusText}` };
         }
 
         const data = await response.json();
@@ -65,6 +65,6 @@ export async function searchUnsplashImages(query: string): Promise<{ success: bo
 
     } catch (fetchError: any) {
         console.error("Error fetching from Unsplash API:", fetchError);
-        return { success: false, error: 'Não foi possível conectar à API do Unsplash.' };
+        return { success: false, error: 'Não foi possível conectar à API de imagens.' };
     }
 }

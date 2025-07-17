@@ -30,10 +30,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, PlusCircle, Edit, Trash2, Link as LinkIcon, CheckCircle2, Gift, ShoppingCart } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Link as LinkIcon, CheckCircle2, Gift, ShoppingCart, ImagePlus } from 'lucide-react';
 import ImageUploader from '@/components/ui/image-uploader';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ImageSearchDialog from '../inspirations/image-search-dialog';
 
 
 const categoryFormSchema = z.object({
@@ -92,6 +93,7 @@ export default function HomeTrousseauClient() {
   const [editingItem, setEditingItem] = useState<HomeTrousseauItem | null>(null);
   
   const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [isImageSearchOpen, setIsImageSearchOpen] = useState(false);
 
   // Forms
   const categoryForm = useForm<z.infer<typeof categoryFormSchema>>({ resolver: zodResolver(categoryFormSchema), defaultValues: { name: '' } });
@@ -289,16 +291,18 @@ export default function HomeTrousseauClient() {
               <DialogHeader><DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item para o Enxoval'}</DialogTitle></DialogHeader>
               <Form {...itemForm}>
                   <form onSubmit={itemForm.handleSubmit(handleItemSubmit)} className="space-y-4">
+                    {itemForm.watch('imageUrl') && (
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
+                            <Image src={itemForm.getValues('imageUrl')!} alt="Prévia" layout="fill" className="object-cover" />
+                        </div>
+                    )}
+                    <Button type="button" variant="outline" className="w-full" onClick={() => setIsImageSearchOpen(true)}>
+                        <ImagePlus className="mr-2" />
+                        {itemForm.watch('imageUrl') ? 'Trocar Imagem de Referência' : 'Buscar Imagem de Referência'}
+                    </Button>
                     <FormField control={itemForm.control} name="name" render={({ field }) => (
                         <FormItem><FormLabel>Nome do Item</FormLabel><FormControl><Input placeholder="Ex: Geladeira Frost Free" {...field}/></FormControl><FormMessage/></FormItem>
                     )}/>
-                    <FormField control={itemForm.control} name="imageUrl" render={() => (
-                      <FormItem>
-                        <FormLabel>Imagem (Opcional)</FormLabel>
-                         <ImageUploader initialImageUrl={itemForm.getValues('imageUrl') || null} onUploadComplete={(url) => itemForm.setValue('imageUrl', url, { shouldValidate: true })} aspectRatio="aspect-video"/>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                        <FormField control={itemForm.control} name="status" render={({ field }) => (
                           <FormItem>
@@ -327,6 +331,14 @@ export default function HomeTrousseauClient() {
           </DialogContent>
       </Dialog>
       
+      <ImageSearchDialog
+        isOpen={isImageSearchOpen}
+        onClose={() => setIsImageSearchOpen(false)}
+        onImageSelect={(imageUrl) => {
+          itemForm.setValue('imageUrl', imageUrl, { shouldDirty: true });
+          setIsImageSearchOpen(false);
+        }}
+      />
     </div>
   );
 }
