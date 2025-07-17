@@ -31,7 +31,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, PlusCircle, Edit, Trash2, Link as LinkIcon, CheckCircle2, Gift, ShoppingCart, ImagePlus } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Link as LinkIcon, CheckCircle2, Gift, ShoppingCart } from 'lucide-react';
 import ImageUploader from '@/components/ui/image-uploader';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -83,7 +83,7 @@ const EmptyState = ({ onAddCategory }: { onAddCategory: () => void }) => (
 
 export default function HomeTrousseauClient() {
   const { toast } = useToast();
-  const { activeWeddingId, loading, homeTrousseauCategories, homeTrousseauItems } = useWedding();
+  const { activeWeddingId, loading, homeTrousseauCategories, homeTrousseauItems, inspirationCategories } = useWedding();
   
   // Dialog State
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -272,7 +272,7 @@ export default function HomeTrousseauClient() {
               <Form {...categoryForm}>
                   <form onSubmit={categoryForm.handleSubmit(handleCategorySubmit)} className="space-y-4 border-t pt-4">
                       <FormField control={categoryForm.control} name="name" render={({ field }) => (
-                          <FormItem><FormLabel>{editingCategory ? `Renomear "${editingCategory.name}"` : 'Nova Categoria'}</FormLabel><FormControl><Input placeholder="Ex: Cozinha, Sala de Estar..." {...field} /></FormControl><FormMessage/></FormItem>
+                          <FormItem><FormLabel>{editingCategory ? `Renomear Categoria` : 'Nova Categoria'}</FormLabel><FormControl><Input placeholder="Ex: Cozinha, Sala de Estar..." {...field} /></FormControl><FormMessage/></FormItem>
                       )}/>
                       <DialogFooter>
                           <Button type="button" variant="ghost" onClick={() => {setEditingCategory(null); categoryForm.reset()}}>Limpar</Button>
@@ -296,6 +296,7 @@ export default function HomeTrousseauClient() {
                               initialImageUrl={field.value || null}
                               onUploadComplete={(url) => itemForm.setValue('imageUrl', url, { shouldDirty: true })}
                               aspectRatio='aspect-video'
+                              inspirationCategories={inspirationCategories}
                           />
                           <FormMessage />
                       </FormItem>

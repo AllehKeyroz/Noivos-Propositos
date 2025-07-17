@@ -22,7 +22,7 @@ import { db } from '@/lib/firebase';
 import { useWedding } from '@/context/wedding-context';
 import { useToast } from '@/hooks/use-toast';
 import { triggerWebhook } from '@/app/actions/webhook-actions';
-import type { GiftSuggestion, ReceivedGift, HomeTrousseauCategory } from '@/lib/types';
+import type { GiftSuggestion, ReceivedGift, HomeTrousseauCategory, InspirationCategory } from '@/lib/types';
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, PlusCircle, Edit, Trash2, Gift, CheckCircle2, ImagePlus } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Gift, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ImageUploader from '@/components/ui/image-uploader';
 
@@ -57,7 +57,7 @@ const receivedGiftFormSchema = z.object({
 
 export default function GiftsClient() {
   const { toast } = useToast();
-  const { activeWeddingId, loading, userProfile, giftSuggestions: suggestions, receivedGifts, homeTrousseauCategories } = useWedding();
+  const { activeWeddingId, loading, userProfile, giftSuggestions: suggestions, receivedGifts, homeTrousseauCategories, inspirationCategories } = useWedding();
 
   const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
   const [editingSuggestion, setEditingSuggestion] = useState<GiftSuggestion | null>(null);
@@ -106,11 +106,12 @@ export default function GiftsClient() {
   const handleSuggestionSubmit = async (values: z.infer<typeof suggestionFormSchema>) => {
     if (!activeWeddingId) return;
     try {
+      const dataToSave = { ...values, imageUrl: values.imageUrl || null };
       if (editingSuggestion) {
-        await updateDoc(doc(db, 'weddings', activeWeddingId, 'giftSuggestions', editingSuggestion.id), values);
+        await updateDoc(doc(db, 'weddings', activeWeddingId, 'giftSuggestions', editingSuggestion.id), dataToSave);
         toast({ title: 'Sucesso', description: 'Sugestão atualizada.' });
       } else {
-        await addDoc(collection(db, 'weddings', activeWeddingId, 'giftSuggestions'), { ...values, claimed: false, createdAt: serverTimestamp() });
+        await addDoc(collection(db, 'weddings', activeWeddingId, 'giftSuggestions'), { ...dataToSave, claimed: false, createdAt: serverTimestamp() });
         toast({ title: 'Sucesso', description: 'Sugestão adicionada.' });
       }
       setIsSuggestionDialogOpen(false);
@@ -331,6 +332,7 @@ export default function GiftsClient() {
                               initialImageUrl={field.value || null}
                               onUploadComplete={(url) => suggestionForm.setValue('imageUrl', url, { shouldDirty: true })}
                               aspectRatio='aspect-video'
+                              inspirationCategories={inspirationCategories}
                           />
                           <FormMessage />
                       </FormItem>
@@ -381,4 +383,5 @@ export default function GiftsClient() {
     </div>
   );
 }
+
 

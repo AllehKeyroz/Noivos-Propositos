@@ -34,7 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, PlusCircle, Edit, Trash2, MessageSquare, Send, Link as LinkIcon } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, MessageSquare, Send, Link as LinkIcon, Search } from 'lucide-react';
 import ImageSearchDialog from './image-search-dialog';
 import ImageUploader from '@/components/ui/image-uploader';
 
@@ -83,20 +83,12 @@ export default function InspirationsClient() {
   const [comments, setComments] = useState<InspirationComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<string>('search');
+  const [activeTab, setActiveTab] = useState<string>('all');
 
   // Forms
   const categoryForm = useForm<z.infer<typeof categoryFormSchema>>({ resolver: zodResolver(categoryFormSchema), defaultValues: { name: '' } });
   const inspirationForm = useForm<z.infer<typeof inspirationFormSchema>>({ resolver: zodResolver(inspirationFormSchema), defaultValues: { notes: '', imageUrl: '', categoryId: '', link: '' } });
   const commentForm = useForm<z.infer<typeof commentFormSchema>>({ resolver: zodResolver(commentFormSchema), defaultValues: { text: '' } });
-
-  useEffect(() => {
-    if (inspirationCategories.length > 0 && activeTab === 'search') {
-      setActiveTab(inspirationCategories[0].id);
-    } else if (inspirationCategories.length === 0) {
-      setActiveTab('search');
-    }
-  }, [inspirationCategories, activeTab]);
 
   useEffect(() => {
     if (editingCategory) categoryForm.reset({ name: editingCategory.name });
@@ -167,7 +159,9 @@ export default function InspirationsClient() {
     inspirationsSnapshot.forEach(d => batch.delete(d.ref));
     await batch.commit();
     toast({ title: 'Sucesso', description: 'Categoria e todas as suas inspirações foram removidas.' });
-    setActiveTab(inspirationCategories.length > 1 ? inspirationCategories.filter(c => c.id !== categoryId)[0].id : 'search');
+    if(activeTab === categoryId) {
+        setActiveTab('all');
+    }
   };
 
   // --- Inspiration Actions ---
@@ -215,35 +209,51 @@ export default function InspirationsClient() {
     } catch (e) { toast({ title: 'Erro', description: 'Não foi possível salvar o comentário.', variant: 'destructive' }) }
   }
 
-  const handleImageFromSearchSelect = (imageUrl: string, categoryId?: string) => {
+  const handleImageFromSearchSelect = async (imageUrl: string, categoryId?: string) => {
+    if (!activeWeddingId) return;
     if (!categoryId) {
-        toast({ title: 'Selecione uma categoria', description: 'Por favor, selecione uma categoria para salvar a imagem.', variant: 'destructive'});
+        toast({
+            title: 'Selecione uma categoria',
+            description: 'Por favor, escolha uma categoria para salvar a imagem.',
+            variant: 'destructive',
+        });
         return;
     }
-    inspirationForm.reset({
-        imageUrl,
-        categoryId,
-        notes: '',
-        link: ''
-    });
-    setIsInspirationDialogOpen(true);
+    
+    try {
+        await addDoc(collection(db, 'weddings', activeWeddingId, 'inspirations'), { 
+            imageUrl, 
+            categoryId,
+            notes: 'Inspiração adicionada da busca',
+            createdAt: serverTimestamp() 
+        });
+        toast({ title: 'Sucesso!', description: 'Inspiração salva no seu mural.' });
+        setActiveTab(categoryId);
+    } catch(e) {
+        toast({ title: 'Erro', description: 'Não foi possível salvar a inspiração.', variant: 'destructive' });
+    }
   }
   
   if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!activeWeddingId) return <div className="text-center p-8 bg-card rounded-lg">Por favor, selecione um casamento.</div>;
+  
+  const displayedInspirations = activeTab === 'all' 
+    ? inspirations 
+    : inspirations.filter(i => i.categoryId === activeTab);
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
           <TabsList className="overflow-x-auto overflow-y-hidden">
-            <TabsTrigger value="search">Buscar Novas Ideias</TabsTrigger>
+            <TabsTrigger value="search"><Search className="mr-2"/>Buscar Novas Ideias</TabsTrigger>
+            <TabsTrigger value="all">Todas</TabsTrigger>
             {inspirationCategories.map(cat => (
               <TabsTrigger key={cat.id} value={cat.id}>{cat.name}</TabsTrigger>
             ))}
           </TabsList>
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" onClick={() => { setEditingCategory(null); setIsCategoryDialogOpen(true); }}>
+            <Button variant="outline" onClick={() => setIsCategoryDialogOpen(true)}>
                   Gerenciar Categorias
             </Button>
             <Button onClick={() => { setEditingInspiration(null); setIsInspirationDialogOpen(true)}}>
@@ -254,37 +264,48 @@ export default function InspirationsClient() {
         </div>
         
         <TabsContent value="search" className="mt-6">
-          <ImageSearchDialog
-            onImageSelect={handleImageFromSearchSelect}
-            categories={inspirationCategories}
-          />
+          <Dialog open={true} onOpenChange={() => setActiveTab('all')}>
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Buscar Inspirações</DialogTitle>
+                <DialogDescription>Encontre referências e adicione-as diretamente ao seu mural com um clique.</DialogDescription>
+              </DialogHeader>
+              <ImageSearchDialog
+                  onImageSelect={handleImageFromSearchSelect}
+                  categories={inspirationCategories}
+              />
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
-        {inspirationCategories.map(cat => (
-          <TabsContent key={cat.id} value={cat.id} className="mt-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {inspirations.filter(i => i.categoryId === cat.id).map(insp => (
-                <Card key={insp.id} className="group relative overflow-hidden cursor-pointer" onClick={() => setViewingInspiration(insp)}>
-                  <Image src={insp.imageUrl} alt={insp.notes || 'Inspiração'} width={400} height={400} className="object-cover aspect-square bg-muted" data-ai-hint="inspiration item" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                      <p className="text-white text-sm text-center line-clamp-2">{insp.notes}</p>
-                  </div>
-                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <Button variant="secondary" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingInspiration(insp); setIsInspirationDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>Remover Inspiração?</AlertDialogTitle></AlertDialogHeader>
-                                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteInspiration(insp.id)}>Remover</AlertDialogAction></AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                </Card>
-              ))}
-            </div>
-            {inspirations.filter(i => i.categoryId === cat.id).length === 0 && (
+        <TabsContent value={activeTab} className="mt-6">
+            {inspirationCategories.length === 0 ? (
+                <EmptyState onAddCategory={() => setIsCategoryDialogOpen(true)} />
+            ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {displayedInspirations.map(insp => (
+                    <Card key={insp.id} className="group relative overflow-hidden cursor-pointer" onClick={() => setViewingInspiration(insp)}>
+                      <Image src={insp.imageUrl} alt={insp.notes || 'Inspiração'} width={400} height={400} className="object-cover aspect-square bg-muted" data-ai-hint="inspiration item" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+                          <p className="text-white text-sm text-center line-clamp-2">{insp.notes}</p>
+                      </div>
+                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <Button variant="secondary" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingInspiration(insp); setIsInspirationDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Remover Inspiração?</AlertDialogTitle></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteInspiration(insp.id)}>Remover</AlertDialogAction></AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </Card>
+                  ))}
+                </div>
+            )}
+            {inspirationCategories.length > 0 && displayedInspirations.length === 0 && (
                 <Card className="text-center py-12 border-dashed">
                     <CardContent>
                         <h3 className="text-lg font-semibold">Nenhuma inspiração aqui.</h3>
@@ -292,13 +313,7 @@ export default function InspirationsClient() {
                     </CardContent>
                 </Card>
             )}
-          </TabsContent>
-        ))}
-         {inspirationCategories.length === 0 && (
-            <TabsContent value="search" className="mt-6">
-                 <ImageSearchDialog onImageSelect={handleImageFromSearchSelect} categories={inspirationCategories} />
-            </TabsContent>
-        )}
+        </TabsContent>
       </Tabs>
 
       {/* Category Management Dialog */}
@@ -349,6 +364,7 @@ export default function InspirationsClient() {
                           initialImageUrl={inspirationForm.getValues('imageUrl')}
                           onUploadComplete={(url) => inspirationForm.setValue('imageUrl', url, { shouldValidate: true })}
                           aspectRatio="aspect-video"
+                          inspirationCategories={inspirationCategories}
                         />
                         <FormMessage />
                       </FormItem>

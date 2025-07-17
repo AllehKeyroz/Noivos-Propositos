@@ -33,6 +33,7 @@ export default function ImageSearchDialog({ onImageSelect, categories = [] }: Im
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   
   useEffect(() => {
+    // Set default category only if there are categories and none is selected
     if (categories.length > 0 && !categories.find(c => c.id === selectedCategory)) {
         setSelectedCategory(categories[0].id);
     }
@@ -61,9 +62,21 @@ export default function ImageSearchDialog({ onImageSelect, categories = [] }: Im
     setIsSearching(false);
   };
   
-  const content = (
-    <>
-      <div>
+  const handleSelectImage = (imageUrl: string) => {
+    if (!selectedCategory && categories.length > 0) {
+        toast({
+            title: 'Selecione uma Categoria',
+            description: 'Por favor, escolha uma categoria para salvar a inspiração.',
+            variant: 'destructive',
+        });
+        return;
+    }
+    onImageSelect(imageUrl, selectedCategory);
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-1">
         <form onSubmit={(e) => handleSearch(e, true)} className="flex gap-2">
           <Input 
             value={searchQuery}
@@ -90,10 +103,10 @@ export default function ImageSearchDialog({ onImageSelect, categories = [] }: Im
         )}
       </div>
 
-      <ScrollArea className="h-full">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4">
+      <ScrollArea className="flex-1 mt-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 pr-4">
           {searchResults.map(img => (
-            <Card key={img.id} className="group relative overflow-hidden cursor-pointer" onClick={() => onImageSelect(img.urls.regular, selectedCategory)}>
+            <Card key={img.id} className="group relative overflow-hidden cursor-pointer" onClick={() => handleSelectImage(img.urls.regular)}>
               <Image src={img.urls.regular} alt={img.alt_description || 'Inspiração'} width={400} height={400} className="object-cover aspect-square bg-muted"/>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 text-center text-white text-xs">
                 {img.alt_description || 'Adicionar esta inspiração'}
@@ -107,25 +120,13 @@ export default function ImageSearchDialog({ onImageSelect, categories = [] }: Im
       </ScrollArea>
 
       {searchResults.length > 0 && (
-        <div className="flex justify-center mt-4">
+        <div className="flex justify-center mt-4 p-1">
             <Button variant="outline" onClick={(e) => handleSearch(e, false)} disabled={isSearching}>
                 {isSearching && currentPage > 1 ? <Loader2 className="animate-spin mr-2"/> : null}
                 Carregar mais
             </Button>
         </div>
       )}
-    </>
+    </div>
   );
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="font-headline">Buscar Inspirações</CardTitle>
-                <CardDescription>Encontre referências e adicione-as diretamente ao seu mural com um clique.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {content}
-            </CardContent>
-        </Card>
-    );
 }
