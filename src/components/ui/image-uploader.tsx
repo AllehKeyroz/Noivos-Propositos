@@ -1,27 +1,35 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud, X } from 'lucide-react';
+import { Loader2, UploadCloud, X, Search } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './dialog';
+import ImageSearchDialog from '@/components/dashboard/inspirations/image-search-dialog';
+import type { InspirationCategory } from '@/lib/types';
+
 
 interface ImageUploaderProps {
   initialImageUrl: string | null;
   onUploadComplete: (url: string) => void;
   aspectRatio?: 'aspect-square' | 'aspect-video' | 'aspect-[3/1]';
+  inspirationCategories?: InspirationCategory[]; // Make it optional
 }
 
 export default function ImageUploader({
   initialImageUrl,
   onUploadComplete,
   aspectRatio = 'aspect-square',
+  inspirationCategories = [],
 }: ImageUploaderProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialImageUrl);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const compressAndConvertToBase64 = (file: File) => {
     const MAX_WIDTH = 1920;
@@ -130,13 +138,18 @@ export default function ImageUploader({
     }
   };
 
+  const handleImageFromSearch = (url: string) => {
+    setPreviewUrl(url);
+    onUploadComplete(url);
+    setIsSearchOpen(false);
+  }
+
   return (
     <div
       className={cn(
-        'relative w-full rounded-lg border-2 border-dashed border-muted-foreground/50 flex flex-col justify-center items-center text-muted-foreground bg-muted/20 overflow-hidden cursor-pointer hover:border-primary/50 transition-colors',
+        'relative w-full rounded-lg border-2 border-dashed border-muted-foreground/50 flex flex-col justify-center items-center text-muted-foreground bg-muted/20 overflow-hidden',
         aspectRatio
       )}
-      onClick={() => fileInputRef.current?.click()}
     >
       <input
         type="file"
@@ -171,9 +184,29 @@ export default function ImageUploader({
 
       {!previewUrl && !isLoading && (
         <div className="text-center p-4">
-          <UploadCloud className="mx-auto h-12 w-12" />
-          <p className="mt-2 text-sm">Clique para enviar uma imagem</p>
-          <p className="text-xs text-muted-foreground/80 mt-1">PNG, JPG, GIF até 5MB</p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button type="button" onClick={() => fileInputRef.current?.click()}>
+                <UploadCloud className="mr-2" /> Enviar Arquivo
+            </Button>
+            <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+                <DialogTrigger asChild>
+                    <Button type="button" variant="secondary">
+                        <Search className="mr-2" /> Buscar Inspiração
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Buscar Inspirações</DialogTitle>
+                        <DialogDescription>Encontre uma imagem de referência para este item.</DialogDescription>
+                    </DialogHeader>
+                    <ImageSearchDialog 
+                        onImageSelect={handleImageFromSearch}
+                        categories={inspirationCategories}
+                    />
+                </DialogContent>
+            </Dialog>
+          </div>
+          <p className="text-xs text-muted-foreground/80 mt-2">PNG, JPG, GIF até 5MB</p>
         </div>
       )}
     </div>
