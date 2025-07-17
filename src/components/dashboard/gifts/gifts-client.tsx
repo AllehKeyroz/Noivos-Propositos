@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -22,6 +23,7 @@ import { useWedding } from '@/context/wedding-context';
 import { useToast } from '@/hooks/use-toast';
 import { triggerWebhook } from '@/app/actions/webhook-actions';
 import type { GiftSuggestion, ReceivedGift, HomeTrousseauCategory } from '@/lib/types';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -32,13 +34,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, PlusCircle, Edit, Trash2, Gift, CheckCircle2 } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Gift, CheckCircle2, ImagePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ImageSearchDialog from '../inspirations/image-search-dialog';
 
 
 const suggestionFormSchema = z.object({
   name: z.string().min(3, { message: 'O nome do presente deve ter pelo menos 3 caracteres.' }),
   description: z.string().optional(),
+  imageUrl: z.string().url().optional().nullable(),
 });
 
 const receivedGiftFormSchema = z.object({
@@ -63,9 +67,11 @@ export default function GiftsClient() {
   
   const [suggestionToReceive, setSuggestionToReceive] = useState<GiftSuggestion | null>(null);
 
+  const [isImageSearchOpen, setIsImageSearchOpen] = useState(false);
+
   const suggestionForm = useForm<z.infer<typeof suggestionFormSchema>>({
     resolver: zodResolver(suggestionFormSchema),
-    defaultValues: { name: '', description: '' },
+    defaultValues: { name: '', description: '', imageUrl: null },
   });
 
   const receivedGiftForm = useForm<z.infer<typeof receivedGiftFormSchema>>({
@@ -77,7 +83,7 @@ export default function GiftsClient() {
 
   useEffect(() => {
     if (isSuggestionDialogOpen) {
-      suggestionForm.reset(editingSuggestion ? { name: editingSuggestion.name, description: editingSuggestion.description } : { name: '', description: '' });
+      suggestionForm.reset(editingSuggestion ? { name: editingSuggestion.name, description: editingSuggestion.description, imageUrl: editingSuggestion.imageUrl } : { name: '', description: '', imageUrl: null });
     } else {
         setEditingSuggestion(null);
     }
@@ -132,7 +138,6 @@ export default function GiftsClient() {
       return existingCategory.id;
     }
     
-    // If not found in context, double check in Firestore to avoid race conditions
     const categoriesRef = collection(db, 'weddings', weddingId, 'homeTrousseauCategories');
     const q = query(categoriesRef, where("name", "==", categoryName), limit(1));
     const querySnapshot = await getDocs(q);
@@ -141,7 +146,6 @@ export default function GiftsClient() {
         return querySnapshot.docs[0].id;
     }
 
-    // If it really doesn't exist, create it
     const newCategoryDoc = await addDoc(categoriesRef, {
         name: categoryName,
         createdAt: serverTimestamp(),
@@ -164,22 +168,19 @@ export default function GiftsClient() {
           } else if (suggestionToReceive) {
               const batch = writeBatch(db);
               
-              // 1. Add to received gifts
               const receivedGiftRef = doc(collection(db, 'weddings', activeWeddingId, 'receivedGifts'));
               batch.set(receivedGiftRef, { ...dataToSave, createdAt: serverTimestamp() });
               
-              // 2. Mark suggestion as claimed
               const suggestionRef = doc(db, 'weddings', activeWeddingId, 'giftSuggestions', suggestionToReceive.id);
               batch.update(suggestionRef, { claimed: true });
 
-              // 3. Add to home trousseau
               const giftCategoryId = await getOrCreateGiftCategory(activeWeddingId);
               const trousseauItemRef = doc(collection(db, 'weddings', activeWeddingId, 'homeTrousseauItems'));
               batch.set(trousseauItemRef, {
                   name: suggestionToReceive.name,
                   notes: `Presente de: ${dataToSave.giverName}. ${suggestionToReceive.description || ''}`.trim(),
                   link: null,
-                  imageUrl: null,
+                  imageUrl: suggestionToReceive.imageUrl || null,
                   status: 'gifted',
                   categoryId: giftCategoryId,
                   createdAt: serverTimestamp(),
@@ -278,6 +279,11 @@ export default function GiftsClient() {
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  {suggestions.length > 0 ? suggestions.map(suggestion => (
                     <Card key={suggestion.id} className={cn("bg-card shadow-lg flex flex-col", suggestion.claimed && "opacity-60 bg-muted/50")}>
+                        {suggestion.imageUrl && (
+                            <div className="relative w-full aspect-video rounded-t-lg overflow-hidden bg-muted">
+                                <Image src={suggestion.imageUrl} alt={suggestion.name} layout="fill" className="object-cover" />
+                            </div>
+                        )}
                         <CardHeader>
                             <CardTitle className="font-headline text-xl">{suggestion.name}</CardTitle>
                             {suggestion.description && <CardDescription>{suggestion.description}</CardDescription>}
@@ -315,12 +321,20 @@ export default function GiftsClient() {
         </TabsContent>
       </Tabs>
       
-      {/* Suggestion Form Dialog */}
       <Dialog open={isSuggestionDialogOpen} onOpenChange={setIsSuggestionDialogOpen}>
         <DialogContent>
             <DialogHeader><DialogTitle>{editingSuggestion ? 'Editar Sugestão' : 'Nova Sugestão de Presente'}</DialogTitle></DialogHeader>
             <Form {...suggestionForm}>
                 <form onSubmit={suggestionForm.handleSubmit(handleSuggestionSubmit)} className="space-y-4">
+                    {suggestionForm.watch('imageUrl') && (
+                         <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
+                            <Image src={suggestionForm.getValues('imageUrl')!} alt="Prévia" layout="fill" className="object-cover" />
+                        </div>
+                    )}
+                     <Button type="button" variant="outline" className="w-full" onClick={() => setIsImageSearchOpen(true)}>
+                        <ImagePlus className="mr-2" />
+                        {suggestionForm.watch('imageUrl') ? 'Trocar Imagem' : 'Buscar Imagem de Referência'}
+                    </Button>
                     <FormField control={suggestionForm.control} name="name" render={({ field }) => (
                         <FormItem><FormLabel>Nome do Presente</FormLabel><FormControl><Input placeholder="Ex: Jogo de panelas" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
@@ -336,7 +350,6 @@ export default function GiftsClient() {
         </DialogContent>
       </Dialog>
       
-      {/* Received Gift Form Dialog */}
       <Dialog open={isReceivedGiftDialogOpen} onOpenChange={setIsReceivedGiftDialogOpen}>
         <DialogContent>
             <DialogHeader><DialogTitle>{editingReceivedGift ? 'Editar Presente' : 'Registrar Presente Recebido'}</DialogTitle></DialogHeader>
@@ -365,6 +378,16 @@ export default function GiftsClient() {
             </Form>
         </DialogContent>
       </Dialog>
+
+       <ImageSearchDialog
+        isOpen={isImageSearchOpen}
+        onClose={() => setIsImageSearchOpen(false)}
+        onImageSelect={(imageUrl) => {
+          suggestionForm.setValue('imageUrl', imageUrl, { shouldDirty: true });
+          setIsImageSearchOpen(false);
+        }}
+        categories={[]}
+      />
     </div>
   );
 }
