@@ -8,7 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, Search } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { InspirationCategory } from '@/lib/types';
@@ -17,18 +16,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface UnsplashImage {
     id: string;
     urls: { regular: string; };
-    alt_description: string;
+    alt_description: string | null;
 }
 
 interface ImageSearchDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
   onImageSelect: (imageUrl: string, categoryId?: string) => void;
   categories: InspirationCategory[];
-  standalone?: boolean;
 }
 
-export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, categories = [], standalone = false }: ImageSearchDialogProps) {
+export default function ImageSearchDialog({ onImageSelect, categories = [] }: ImageSearchDialogProps) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UnsplashImage[]>([]);
@@ -67,13 +63,7 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
   
   const content = (
     <>
-      {!standalone && (
-          <DialogHeader>
-            <DialogTitle>Buscar Imagem de Referência</DialogTitle>
-            <DialogDescription>Encontre a imagem perfeita para ilustrar sua ideia.</DialogDescription>
-          </DialogHeader>
-      )}
-      <div className={standalone ? "" : "py-4"}>
+      <div>
         <form onSubmit={(e) => handleSearch(e, true)} className="flex gap-2">
           <Input 
             value={searchQuery}
@@ -87,7 +77,7 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
           </Button>
         </form>
 
-        {standalone && categories.length > 0 && (
+        {categories.length > 0 && (
             <div className="mt-4">
                 <label className="text-sm font-medium">Salvar na categoria</label>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -101,12 +91,12 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
       </div>
 
       <ScrollArea className="h-full">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4">
           {searchResults.map(img => (
             <Card key={img.id} className="group relative overflow-hidden cursor-pointer" onClick={() => onImageSelect(img.urls.regular, selectedCategory)}>
               <Image src={img.urls.regular} alt={img.alt_description || 'Inspiração'} width={400} height={400} className="object-cover aspect-square bg-muted"/>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 text-center text-white text-xs">
-                {img.alt_description}
+                {img.alt_description || 'Adicionar esta inspiração'}
               </div>
               <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button size="icon" className="h-8 w-8"><PlusCircle /></Button>
@@ -127,7 +117,6 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
     </>
   );
 
-  if (standalone) {
     return (
         <Card>
             <CardHeader>
@@ -139,13 +128,4 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
             </CardContent>
         </Card>
     );
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
-        {content}
-      </DialogContent>
-    </Dialog>
-  );
 }

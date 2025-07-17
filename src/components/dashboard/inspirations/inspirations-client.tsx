@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, PlusCircle, Edit, Trash2, MessageSquare, Send, Link as LinkIcon } from 'lucide-react';
 import ImageSearchDialog from './image-search-dialog';
+import ImageUploader from '../ui/image-uploader';
 
 
 const categoryFormSchema = z.object({
@@ -81,8 +82,6 @@ export default function InspirationsClient() {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
   // Image Search State
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [imageToSave, setImageToSave] = useState<string | null>(null);
   const [searchDefaultCategory, setSearchDefaultCategory] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<string>('search');
@@ -108,16 +107,17 @@ export default function InspirationsClient() {
   }, [editingInspiration, inspirationForm]);
 
    useEffect(() => {
-    if (imageToSave) {
-        inspirationForm.reset({
-            notes: '',
-            imageUrl: imageToSave,
-            categoryId: searchDefaultCategory,
-            link: ''
-        });
-        setIsInspirationDialogOpen(true);
+    // When opening the form manually (not from search)
+    if (isInspirationDialogOpen && !inspirationForm.getValues('imageUrl')) {
+      const defaultCategory = inspirationCategories.find(c => c.id === activeTab) ? activeTab : (inspirationCategories[0]?.id || '');
+      inspirationForm.reset({
+        notes: '',
+        imageUrl: '',
+        categoryId: defaultCategory,
+        link: ''
+      });
     }
-  }, [imageToSave, inspirationForm, searchDefaultCategory]);
+  }, [isInspirationDialogOpen, inspirationCategories, activeTab, inspirationForm]);
   
   useEffect(() => {
     if (!viewingInspiration || !activeWeddingId) {
@@ -172,7 +172,6 @@ export default function InspirationsClient() {
         toast({ title: 'Sucesso', description: 'Inspiração adicionada.' });
       }
       setIsInspirationDialogOpen(false);
-      setImageToSave(null);
     } catch (e) { toast({ title: 'Erro', description: 'Não foi possível salvar a inspiração.', variant: 'destructive' }) }
   };
 
@@ -184,12 +183,19 @@ export default function InspirationsClient() {
   
   // --- Comment Actions ---
   const handleCommentSubmit = async (values: z.infer<typeof commentFormSchema>) => {
-    if (!activeWeddingId || !viewingInspiration || !userProfile?.role || !['bride', 'groom'].includes(userProfile.role)) return;
+    if (!activeWeddingId || !viewingInspiration || !userProfile?.id) return;
+    
+    // Ensure only bride or groom can comment
+    if (userProfile.role !== 'bride' && userProfile.role !== 'groom' && userProfile.role !== 'super_admin') {
+      toast({ title: "Acesso negado", description: "Apenas o casal pode comentar nas inspirações.", variant: "destructive"});
+      return;
+    }
+
     try {
         await addDoc(collection(db, 'weddings', activeWeddingId, 'inspirations', viewingInspiration.id, 'comments'), {
             text: values.text,
             authorUid: userProfile.id,
-            authorName: userProfile.name,
+            authorName: userProfile.name || 'Usuário',
             authorRole: userProfile.role,
             createdAt: serverTimestamp()
         });
@@ -197,13 +203,18 @@ export default function InspirationsClient() {
     } catch (e) { toast({ title: 'Erro', description: 'Não foi possível salvar o comentário.', variant: 'destructive' }) }
   }
 
-  const openSearchDialog = () => {
-    if (inspirationCategories.length === 0) {
-      toast({ title: 'Crie uma categoria primeiro', description: 'Você precisa ter pelo menos uma categoria para salvar suas inspirações.' });
-      return;
+  const handleImageFromSearchSelect = (imageUrl: string, categoryId?: string) => {
+    if (!categoryId) {
+        toast({ title: 'Selecione uma categoria', description: 'Por favor, selecione uma categoria para salvar a imagem.', variant: 'destructive'});
+        return;
     }
-    setSearchDefaultCategory(inspirationCategories[0].id);
-    setIsSearchOpen(true);
+    inspirationForm.reset({
+        imageUrl,
+        categoryId,
+        notes: '',
+        link: ''
+    });
+    setIsInspirationDialogOpen(true);
   }
   
   if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -223,19 +234,17 @@ export default function InspirationsClient() {
             <Button variant="outline" onClick={() => { setEditingCategory(null); setIsCategoryDialogOpen(true); }}>
                   Gerenciar Categorias
             </Button>
+            <Button onClick={() => { setEditingInspiration(null); setIsInspirationDialogOpen(true)}}>
+                <PlusCircle className="mr-2" />
+                Adicionar Manualmente
+            </Button>
           </div>
         </div>
         
         <TabsContent value="search" className="mt-6">
           <ImageSearchDialog
-            isOpen={true}
-            onClose={() => {}}
-            onImageSelect={(imageUrl, categoryId) => {
-              setSearchDefaultCategory(categoryId);
-              setImageToSave(imageUrl);
-            }}
+            onImageSelect={handleImageFromSearchSelect}
             categories={inspirationCategories}
-            standalone={true}
           />
         </TabsContent>
 
@@ -267,7 +276,7 @@ export default function InspirationsClient() {
                 <Card className="text-center py-12 border-dashed">
                     <CardContent>
                         <h3 className="text-lg font-semibold">Nenhuma inspiração aqui.</h3>
-                        <p className="text-muted-foreground mt-1">Vá para a aba "Buscar Novas Ideias" para adicionar inspirações a esta categoria.</p>
+                        <p className="text-muted-foreground mt-1">Adicione uma manualmente ou use a busca para popular esta categoria.</p>
                     </CardContent>
                 </Card>
             )}
@@ -311,16 +320,22 @@ export default function InspirationsClient() {
       </Dialog>
       
       {/* Inspiration Form Dialog */}
-      <Dialog open={isInspirationDialogOpen} onOpenChange={(isOpen) => { setIsInspirationDialogOpen(isOpen); if (!isOpen) setImageToSave(null); }}>
+      <Dialog open={isInspirationDialogOpen} onOpenChange={setIsInspirationDialogOpen}>
           <DialogContent>
               <DialogHeader><DialogTitle>{editingInspiration ? 'Editar Inspiração' : 'Adicionar Inspiração ao Mural'}</DialogTitle></DialogHeader>
               <Form {...inspirationForm}>
                   <form onSubmit={inspirationForm.handleSubmit(handleInspirationSubmit)} className="space-y-4">
-                    {inspirationForm.getValues('imageUrl') && (
-                         <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
-                            <Image src={inspirationForm.getValues('imageUrl')} alt="inspiração" layout="fill" className="object-cover"/>
-                        </div>
-                    )}
+                    <FormField control={inspirationForm.control} name="imageUrl" render={() => (
+                      <FormItem>
+                        <FormLabel>Foto da Inspiração</FormLabel>
+                        <ImageUploader 
+                          initialImageUrl={inspirationForm.getValues('imageUrl')}
+                          onUploadComplete={(url) => inspirationForm.setValue('imageUrl', url, { shouldValidate: true })}
+                          aspectRatio="aspect-video"
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
                     <FormField control={inspirationForm.control} name="categoryId" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Salvar na Categoria</FormLabel>
@@ -330,6 +345,7 @@ export default function InspirationsClient() {
                                     {inspirationCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
+                            <FormMessage />
                         </FormItem>
                     )}/>
                     <FormField control={inspirationForm.control} name="notes" render={({ field }) => (
