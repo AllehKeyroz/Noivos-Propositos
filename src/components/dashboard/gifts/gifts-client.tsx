@@ -36,7 +36,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, PlusCircle, Edit, Trash2, Gift, CheckCircle2, ImagePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import ImageUploader from '../ui/image-uploader';
+import ImageUploader from '@/components/ui/image-uploader';
 
 
 const suggestionFormSchema = z.object({
@@ -381,3 +381,4 @@ export default function GiftsClient() {
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,6 +17,7 @@ import {
   where,
   getDocs,
   onSnapshot,
+  orderBy,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useWedding } from '@/context/wedding-context';
@@ -34,7 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, PlusCircle, Edit, Trash2, MessageSquare, Send, Link as LinkIcon } from 'lucide-react';
 import ImageSearchDialog from './image-search-dialog';
-import ImageUploader from '../ui/image-uploader';
+import ImageUploader from '@/components/ui/image-uploader';
 
 
 const categoryFormSchema = z.object({
@@ -81,15 +83,20 @@ export default function InspirationsClient() {
   const [comments, setComments] = useState<InspirationComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
-  // Image Search State
-  const [searchDefaultCategory, setSearchDefaultCategory] = useState<string>('');
-
   const [activeTab, setActiveTab] = useState<string>('search');
 
   // Forms
   const categoryForm = useForm<z.infer<typeof categoryFormSchema>>({ resolver: zodResolver(categoryFormSchema), defaultValues: { name: '' } });
   const inspirationForm = useForm<z.infer<typeof inspirationFormSchema>>({ resolver: zodResolver(inspirationFormSchema), defaultValues: { notes: '', imageUrl: '', categoryId: '', link: '' } });
   const commentForm = useForm<z.infer<typeof commentFormSchema>>({ resolver: zodResolver(commentFormSchema), defaultValues: { text: '' } });
+
+  useEffect(() => {
+    if (inspirationCategories.length > 0 && activeTab === 'search') {
+      setActiveTab(inspirationCategories[0].id);
+    } else if (inspirationCategories.length === 0) {
+      setActiveTab('search');
+    }
+  }, [inspirationCategories, activeTab]);
 
   useEffect(() => {
     if (editingCategory) categoryForm.reset({ name: editingCategory.name });
@@ -113,7 +120,7 @@ export default function InspirationsClient() {
       inspirationForm.reset({
         notes: '',
         imageUrl: '',
-        categoryId: defaultCategory,
+        categoryId: defaultCategory || '',
         link: ''
       });
     }
@@ -125,7 +132,7 @@ export default function InspirationsClient() {
       return;
     }
     setIsLoadingComments(true);
-    const commentsQuery = query(collection(db, 'weddings', activeWeddingId, 'inspirations', viewingInspiration.id, 'comments'));
+    const commentsQuery = query(collection(db, 'weddings', activeWeddingId, 'inspirations', viewingInspiration.id, 'comments'), orderBy('createdAt', 'asc'));
     const unsubscribe = onSnapshot(commentsQuery, snapshot => {
       setComments(snapshot.docs.map(d => ({id: d.id, ...d.data()}) as InspirationComment).sort((a,b) => a.createdAt.toMillis() - b.createdAt.toMillis()));
       setIsLoadingComments(false);
@@ -141,10 +148,13 @@ export default function InspirationsClient() {
         await updateDoc(doc(db, 'weddings', activeWeddingId, 'inspirationCategories', editingCategory.id), { name: values.name });
         toast({ title: 'Sucesso', description: 'Categoria atualizada.' });
       } else {
-        await addDoc(collection(db, 'weddings', activeWeddingId, 'inspirationCategories'), { ...values, createdAt: serverTimestamp() });
+        const newDoc = await addDoc(collection(db, 'weddings', activeWeddingId, 'inspirationCategories'), { ...values, createdAt: serverTimestamp() });
         toast({ title: 'Sucesso', description: 'Categoria criada.' });
+        setActiveTab(newDoc.id);
       }
       setIsCategoryDialogOpen(false);
+      setEditingCategory(null);
+      categoryForm.reset();
     } catch (e) { toast({ title: 'Erro', description: 'Não foi possível salvar a categoria.', variant: 'destructive' }) }
   };
 
@@ -157,6 +167,7 @@ export default function InspirationsClient() {
     inspirationsSnapshot.forEach(d => batch.delete(d.ref));
     await batch.commit();
     toast({ title: 'Sucesso', description: 'Categoria e todas as suas inspirações foram removidas.' });
+    setActiveTab(inspirationCategories.length > 1 ? inspirationCategories.filter(c => c.id !== categoryId)[0].id : 'search');
   };
 
   // --- Inspiration Actions ---
@@ -170,6 +181,7 @@ export default function InspirationsClient() {
       } else {
         await addDoc(collection(db, 'weddings', activeWeddingId, 'inspirations'), { ...dataToSave, createdAt: serverTimestamp() });
         toast({ title: 'Sucesso', description: 'Inspiração adicionada.' });
+        setActiveTab(dataToSave.categoryId);
       }
       setIsInspirationDialogOpen(false);
     } catch (e) { toast({ title: 'Erro', description: 'Não foi possível salvar a inspiração.', variant: 'destructive' }) }
@@ -282,17 +294,22 @@ export default function InspirationsClient() {
             )}
           </TabsContent>
         ))}
+         {inspirationCategories.length === 0 && (
+            <TabsContent value="search" className="mt-6">
+                 <ImageSearchDialog onImageSelect={handleImageFromSearchSelect} categories={inspirationCategories} />
+            </TabsContent>
+        )}
       </Tabs>
 
       {/* Category Management Dialog */}
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
           <DialogContent>
               <DialogHeader><DialogTitle>Gerenciar Categorias</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-2 py-4 max-h-60 overflow-y-auto">
               {inspirationCategories.map(cat => (
-                <div key={cat.id} className="flex items-center justify-between">
+                <div key={cat.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
                     <p>{cat.name}</p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => { setEditingCategory(cat); }}><Edit className="h-4 w-4"/></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
@@ -308,7 +325,7 @@ export default function InspirationsClient() {
               <Form {...categoryForm}>
                   <form onSubmit={categoryForm.handleSubmit(handleCategorySubmit)} className="space-y-4 border-t pt-4">
                       <FormField control={categoryForm.control} name="name" render={({ field }) => (
-                          <FormItem><FormLabel>{editingCategory ? 'Renomear Categoria' : 'Nova Categoria'}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage/></FormItem>
+                          <FormItem><FormLabel>{editingCategory ? `Renomear Categoria` : 'Nova Categoria'}</FormLabel><FormControl><Input placeholder="Ex: Decoração, Vestidos..." {...field} /></FormControl><FormMessage/></FormItem>
                       )}/>
                       <DialogFooter>
                           <Button type="button" variant="ghost" onClick={() => {setEditingCategory(null); categoryForm.reset()}}>Limpar</Button>
