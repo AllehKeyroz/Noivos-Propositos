@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { searchUnsplashImages } from '@/app/actions/unsplash-actions';
 import { useToast } from '@/hooks/use-toast';
@@ -10,7 +11,7 @@ import { Loader2, PlusCircle, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InspirationCategory } from '@/lib/types';
+import type { InspirationCategory } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface UnsplashImage {
@@ -22,18 +23,24 @@ interface UnsplashImage {
 interface ImageSearchDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImageSelect: (imageUrl: string, categoryId: string) => void;
-  categories: InspirationCategory[];
-  standalone?: boolean; // If true, it renders as a full component, not a dialog
+  onImageSelect: (imageUrl: string, categoryId?: string) => void;
+  categories?: InspirationCategory[];
+  standalone?: boolean;
 }
 
-export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, categories, standalone = false }: ImageSearchDialogProps) {
+export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, categories = [], standalone = false }: ImageSearchDialogProps) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UnsplashImage[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]?.id || '');
+  
+  useEffect(() => {
+    if (categories.length > 0 && !categories.find(c => c.id === selectedCategory)) {
+        setSelectedCategory(categories[0].id);
+    }
+  }, [categories, selectedCategory]);
 
   const handleSearch = async (e: React.FormEvent, newSearch = true) => {
     e.preventDefault();
@@ -84,7 +91,7 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
             <div className="mt-4">
                 <label className="text-sm font-medium">Salvar na categoria</label>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Selecione uma categoria..."/></SelectTrigger>
                     <SelectContent>
                         {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                     </SelectContent>
@@ -125,7 +132,7 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
         <Card>
             <CardHeader>
                 <CardTitle className="font-headline">Buscar Inspirações</CardTitle>
-                <CardDescription>Encontre referências de alta qualidade e adicione-as diretamente ao seu mural com um clique.</CardDescription>
+                <CardDescription>Encontre referências e adicione-as diretamente ao seu mural com um clique.</CardDescription>
             </CardHeader>
             <CardContent>
                 {content}

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -338,6 +339,7 @@ export default function HomeTrousseauClient() {
           itemForm.setValue('imageUrl', imageUrl, { shouldDirty: true });
           setIsImageSearchOpen(false);
         }}
+        categories={[]}
       />
     </div>
   );

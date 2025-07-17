@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -385,6 +386,7 @@ export default function GiftsClient() {
           suggestionForm.setValue('imageUrl', imageUrl, { shouldDirty: true });
           setIsImageSearchOpen(false);
         }}
+        categories={[]}
       />
     </div>
   );
