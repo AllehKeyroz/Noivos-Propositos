@@ -24,7 +24,7 @@ interface ImageSearchDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onImageSelect: (imageUrl: string, categoryId?: string) => void;
-  categories?: InspirationCategory[];
+  categories: InspirationCategory[];
   standalone?: boolean;
 }
 
@@ -34,7 +34,7 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
   const [searchResults, setSearchResults] = useState<UnsplashImage[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]?.id || '');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   
   useEffect(() => {
     if (categories.length > 0 && !categories.find(c => c.id === selectedCategory)) {
@@ -104,7 +104,7 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pr-4">
           {searchResults.map(img => (
             <Card key={img.id} className="group relative overflow-hidden cursor-pointer" onClick={() => onImageSelect(img.urls.regular, selectedCategory)}>
-              <Image src={img.urls.regular} alt={img.alt_description} width={400} height={400} className="object-cover aspect-square bg-muted"/>
+              <Image src={img.urls.regular} alt={img.alt_description || 'Imagem de inspiração'} width={400} height={400} className="object-cover aspect-square bg-muted"/>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 text-center text-white text-xs">
                 {img.alt_description}
               </div>
