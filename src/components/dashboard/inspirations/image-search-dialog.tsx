@@ -100,11 +100,11 @@ export default function ImageSearchDialog({ isOpen, onClose, onImageSelect, cate
         )}
       </div>
 
-      <ScrollArea className="h-[50vh]">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pr-4">
+      <ScrollArea className="max-h-[60vh] -mr-4 pr-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {searchResults.map(img => (
             <Card key={img.id} className="group relative overflow-hidden cursor-pointer" onClick={() => onImageSelect(img.urls.regular, selectedCategory)}>
-              <Image src={img.urls.regular} alt={img.alt_description || 'Imagem de inspiração'} width={400} height={400} className="object-cover aspect-square bg-muted"/>
+              <Image src={img.urls.regular} alt={img.alt_description || "Inspiração"} width={400} height={400} className="object-cover aspect-square bg-muted"/>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 text-center text-white text-xs">
                 {img.alt_description}
               </div>
